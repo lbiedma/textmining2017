@@ -1,0 +1,158 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[latin1]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\author{Luis Biedma}
+\title{Práctico Clustering - Minería de Texto 2017}
+
+\begin{document}
+\maketitle
+	
+\section{Introducción}
+	Para la realización del práctico estudié el algoritmo Exchange Clustering propuesto por Reinhard Kneser y Hermann Ney en 1993\cite{kneserney} y lo apliqué a la sección de Libros del corpus SBWCE de Cristian Cardellino\cite{cardellinoSBWCE} en \url{http://crscardellino.me/SBWCE/}. En el desarrollo del trabajo voy a explicar el preprocesamiento del texto y la instalación y uso de los programas para clustering utilizados. Luego voy a hacer un pequeño análisis cualitativo de las clases de palabras obtenidas, para varios casos de aplicación. Al finalizar el trabajo habrá unas conclusiones sobre el método de trabajo utilizado y los resultados obtenidos.
+	
+\section{Exchange Clustering}
+	El algoritmo de Exchange Clustering genera clases de palabras ``duras" (una palabra pertenece a sólo una clase) a partir de analizar, en el caso de la aplicación en este informe, bigramas de palabras.
+	
+	Normalmente, las clases de palabras están basadas en conceptos semánticos sintácticos y son definidas por expertos en lenguaje. En éste caso se las llama parts of speech (PoS). Generalizando el concepto de similaridades entre palabras se pueden definir clases de las mismas usando algún criterio estadístico, que podría ser la máxima verosimilitud o ``perplexity". Entonces se pueden crear las clases de palabras usando un algoritmo de clustering basado en minimizar la perplexity de un modelo de clases por bigramas sobre el corpus de entrenamiento.
+	
+	Una descripción resumida del algoritmo presentado por Sven Martin et. al.\cite{martin1998algorithms} para exchange clustering se extiende a continuación:
+	
+	Se particiona un vocabulario de tamaño $W$ en un número $G$ de clases de palabras. La partición elegida está representada por la función de mapeo de clases $G: w \rightarrow g_w$, que lleva cada palabra $w$ a su clase correspondiente $g_w$. Dado un bigrama $(v, w)$, uno puede tener el bigrama de clases $(g_v, g_w)$. Luego, para modelos de clases, tenemos dos distribuciones de probabilidades:
+	
+	\begin{itemize}
+	\item una \textit{función de probabilidad de transición} $p_1(g_w | g_v)$ que representa la probabilidad de predecir la clase de palabras $g_w$ después de haber observado la clase $g_v$.
+	
+	\item una \textit{función de probabilidad de pertenencia} $p_0(w | g)$ que estima la palabra $w$ a partir de la clase $g$.
+	\end{itemize}
+
+	Luego, para un modelo de bigramas de clases, tenemos:
+	
+	$$
+	p(w | v) = p_0(w | g_w) . p_1(g_w | g_v).
+	$$
+	
+	El algoritmo de exchange clustering intenta minimizar todas estas sumas para todas las palabras y sus correspondientes clases, dando una función de clase inicial, para luego ir intercambiando palabras entre ellas sólo si logran bajar el valor de perplexity en el corpus de entrenamiento. El algoritmo se detiene luego de una cantidad de tiempo o iteraciones realizadas.
+	
+	\section{Preprocesamiento}
+	La sección de libros del corpus utilizado contiene las siguientes obras:
+	
+	\begin{itemize}
+	\item Jane Austen: Sentido y Sensibilidad.
+	\item Charlotte Brontë: Jane Eyre.
+	\item Lewis Carroll: Alicia en el País de las Maravillas.
+	\item Miguel de Cervantes: Don Quijote de la Mancha.
+	\item Daniel Defoe: Robinson Crusoe.
+	\item Sir Arthur Conan Doyle: Las Aventuras de Sherlock Holmes.
+	\item Sir Arthur Conan Doyle: El Sabueso de los Baskerville.
+	\item Sir Arthur Conan Doyle: Estudio en Escarlata.
+	\item Alexandre Dumas: Los Tres Mosqueteros.
+	\item Franz Kafka: La Metamorfosis.
+	\item Edgar Allan Poe: La Caída de la Casa de Usher.
+	\item Leo Tolstoi: Anna Karenina Vol. 1 y 2.
+	\item Julio Verne: 20.000 Leguas de Viaje Submarino.
+	\item Julio Verne: La Vuelta al Mundo en 80 Días.
+	\item Julio Verne: Viaje al Centro de la Tierra.
+	\item Julio Verne: La Isla Misteriosa.
+	\item Voltaire: Cándida
+	\end{itemize}
+	
+	Todas las obras se encuentran en un mismo archivo de texto, de aproximadamente 93.000 líneas y 2.000.000 palabras.
+	
+	Para el preprocesamiento del texto utilicé las librerías Spacy (\url{https://spacy.io/}) y una de sus extensiones: Textacy (\url{https://github.com/chartbeat-labs/textacy}). El texto venía ya organizado en una oración por cada línea, por lo que restaba solamente quitar signos de puntuación, URLs, algunos espacios en blanco y luego tokenizarlo. Para la tokenización, es posible utilizar el procesador de lenguaje español en Spacy, lo cual no dio grandes complicaciones.
+	
+	
+	\section{Experimentos}
+	Para realizar los experimentos, utilicé una librería de Exchange Clustering creada en Aalto University de Finlandia (\url{https://github.com/aalto-speech/exchange}). Las mismas están hechas en C++, siguiendo la guía de la publicación de Botros et. al. para aceleración del algoritmo\cite{acceleration}. Los parámetros a cambiar en la función son los siguientes:
+	
+	\begin{itemize}
+	\item Cantidad de clases a obtener.
+	\item Máximo número de iteraciones del algoritmo.
+	\item Tiempo límite de optimización.
+	\item Número de hilos a utilizar (el algoritmo es paralelizable).
+	\item Posibilidad de agregar una lista con el vocabulario del texto a analizar para mejorar el clustering.
+	\end{itemize}
+	
+	Los primeros experimentos fueron realizados eligiendo 500 y 200 clases, pero ésto hizo casi imposible el análisis cualitativo de los clusters.
+	
+	Con la información del tokenizador es posible extraer además la cantidad de ocurrencias, entonces se creó un archivo de texto con el vocabulario a analizar, para ayudar al algoritmo de clustering a mejorar las clases obtenidas. Para obtener el vocabulario, se cortaron todas las palabras que tenían 2 o menos ocurrencias y también las 10 palabras con la mayor cantidad de apariciones en el texto, que fueron elegidas como \textit{stop words}.
+	
+	Así, los experimentos sobre los que se mostrará algunos resultados cualitativos fueron corridos con la opción de agregar vocabulario, con lo que se pudo bajar la cantidad de palabras únicas a 30.000, de las cuales se obtuvieron 50 clases.
+	
+	\section{Análisis Cualitativo}
+	
+	A continuación se presenta el contenido de algunos de los clusters obtenidos:
+	
+	\vspace{0.5cm}
+	
+	\begin{tabular}{c|l}
+	Cluster & Palabras \\
+	\hline
+	1 & le, me, nos, te, os, les \\
+	\hline
+	2 & como, pero, o, ni, cuando, porque, pues, donde, sino, aunque \\
+	\hline
+	5 & había, ha, he, habían, haber, hubiera, han, habría \\
+	\hline
+	6 & es, era, fue, tenía, hay, tiene, fuera, tengo, hacía, sé \\ 
+	\hline
+	7 & sus, mis, estas, otras, aquellos, grandes, algunas, unas \\
+	\hline
+	8 & dijo, respondió, preguntó, exclamó, contestó, añadió \\
+	\hline
+	9 & Quijote, Rochester, Fernando, Luis, Antonio, Brocklehurst \\
+	\hline
+	11 & si, yo, ya, menos, sólo, quien, también, siempre, cómo \\
+	\hline
+	13 & días, veces, años, pies, horas, pasos, minutos, millas \\
+	\hline
+	16 & casa, mano, cabeza, puerta, mundo, mar, isla, tierra \\
+	\hline
+	20 & podía, puede, debía, puedo, quería, podría, pudo, quiero \\
+	\hline 
+	21 & No, Y, Pero, En, A, Por, Qué, Me, Es, Se, Sí \\
+	\hline
+	24 & sobre, hasta, entre, hacia, desde, ante, durante \\
+	\hline
+	30 & dos, tres, unos, otros, mil, cuatro, algunos \\
+	\hline
+	33 & mal, tarde, solo, grande, lejos, terrible, fuerte, alto \\
+	\hline
+	36 & DArtagnan, Levin, Ana, Vronsky, Pencroff, Athos, Kitty, Holmes \\
+	\hline
+	39 & ser, hacer, decir, ver, dar, estar, tener, hablar, saber, ir \\
+	\hline
+	42 & ojos, cosas, palabras, manos, hombres, amigos, compañeros \\
+	\hline
+	\end{tabular}
+
+	\vspace{0.5cm}
+
+	Se puede observar que:
+	\begin{itemize}
+	\item el cluster 2 junta algunos de los adverbios más utilizados.
+	\item en los clusters 5, 6 y 20 encontramos muchas conjunciones de los verbos \textit{haber, ser, tener, poder, deber y querer}.
+	\item el cluster 7 está formado por muchos pronombres demostrativos.
+	\item el cluster 8 presenta verbos en estilo indirecto, que tienen mucha importancia al contar historias. Esta clase tiene mucho sentido para un dataset de libros.
+	\item el cluster 9 tiene algunos nombres propios, al igual que el 36.
+	\item el cluster 13 presenta unidades de medición de tiempo o distancia.
+	\item el cluster 21 acumula muchos conectores que inician oraciones, al no haber hecho ninguna normalización pasando de mayúsculas a minúsculas, el algoritmo asignó una clase a casi todos ellos.
+	\item el cluster 24 agrupa muchas preposiciones.
+	\item el cluster 30 es el que carga con los adjetivos cardinales.
+	\item el cluster 33 contiene adjetivos.
+	\item el cluster 39 tiene la forma raíz de muchos verbos.
+	\item el cluster 42 tiene varios sustantivos en su forma plural.
+	\end{itemize}
+	
+	El análisis claramente puede ser mucho más rico si se tiene todos los clusters a la vista, que están en los archivos adjuntos, donde además de la palabra y su correspondiente clase, también se encuentra un número que se puede interpretar como la cercanía al centro del cluster. El agrupamiento se observó utilizando Pandas y algunas de las instrucciones se encuentran en el Notebook de Jupyter.
+	
+	\section{Conclusiones}
+	El algoritmo de exchange clustering parece una herramienta muy interesante para obtener clases de palabras de forma rápida y eficiente gracias a la implementación en C++ utilizada. El uso de un vocabulario es de mucha ayuda para obtener buenos resultados y tal vez sea necesario cortar aún más palabras por la cantidad de ocurrencias o definir mejor las \textit{stop words} para obtener clusters más homogéneos. Probablemente también sea mejor buscar menos clusters, quizás 40 o 30. Un análisis morfosintáctico anterior también podría ser de utilidad para obtener las raíces de las palabras en vez de todas sus formas, pero tal vez eso pueda quitarle un poco de riqueza a las diferentes clases obtenidas.
+	 
+	\bibliographystyle{plain}	
+	\bibliography{biblio.bib}
+\end{document}
